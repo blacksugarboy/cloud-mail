@@ -3,7 +3,15 @@ import verifyRecordService from '../service/verify-record-service';
 export const userConst = {
 	status: {
 		NORMAL: 0,
-		BAN: 1
+		BAN: 1,
+		INVALID: 2
+	},
+	validity: {
+		WEEK: 'week',
+		MONTH: 'month',
+		YEAR: 'year',
+		PERMANENT: 'permanent',
+		RANGE: 'range'
 	}
 }
 
@@ -125,10 +133,6 @@ export const settingConst = {
 		CLOSE: 1
 	},
 	forcePathStyle: {
-		OPEN: 0,
-		CLOSE: 1
-	},
-	aiCode: {
 		OPEN: 0,
 		CLOSE: 1
 	},

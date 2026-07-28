@@ -47,6 +47,7 @@ const requirePerms = [
 	'/user/delete',
 	'/user/setPwd',
 	'/user/setStatus',
+	'/user/setValidity',
 	'/user/setType',
 	'/user/list',
 	'/user/restore',
@@ -55,6 +56,7 @@ const requirePerms = [
 	'/user/deleteAccount',
 	'/user/allAccount',
 	'/regKey/add',
+	'/regKey/batchAdd',
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
@@ -77,6 +79,7 @@ const premKey = {
 	'user:reset-send': ['/user/resetSendCount'],
 	'user:set-pwd': ['/user/setPwd'],
 	'user:set-status': ['/user/setStatus', '/user/restore'],
+	'user:set-validity': ['/user/setValidity'],
 	'user:set-type': ['/user/setType'],
 	'user:delete': ['/user/delete','/user/deleteAccount'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest'],
@@ -84,7 +87,7 @@ const premKey = {
 	'setting:query': ['/setting/query'],
 	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist'],
 	'analysis:query': ['/analysis/echarts'],
-	'reg-key:add': ['/regKey/add'],
+	'reg-key:add': ['/regKey/add', '/regKey/batchAdd'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 };
@@ -131,6 +134,16 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
+	const currentUser = await userService.selectByIdIncludeDel(c, userId);
+	if (!currentUser
+		|| currentUser.isDel
+		|| currentUser.status
+		|| !userService.isUserValid(currentUser, c.env.admin)) {
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		throw new BizError(t('authExpired'), 401);
+	}
+	authInfo.user = currentUser;
+
 	const permIndex = requirePerms.findIndex(item => {
 		return path.startsWith(item);
 	});
@@ -160,7 +173,7 @@ app.use('*', async (c, next) => {
 		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 	}
 
-	c.set('user',authInfo.user)
+	c.set('user',currentUser)
 
 	return await next();
 });

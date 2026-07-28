@@ -129,14 +129,24 @@ const publicService = {
 		for (const emailRow of list) {
 			let { email, hash, salt, roleName } = emailRow;
 			let type = defRole.roleId;
+			const validity = userService.buildValidity(emailRow.validType || params.validType);
+			const validStartSql = validity.validStartTime ? `'${validity.validStartTime}'` : 'NULL';
+			const validEndSql = validity.validEndTime ? `'${validity.validEndTime}'` : 'NULL';
 
 			if (roleName) {
 				const roleRow = roleList.find(role => role.name === roleName);
 				type = roleRow ? roleRow.roleId : type;
 			}
 
-			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
+			const userSql = `INSERT INTO user (
+				email, password, salt, type, os, browser, active_ip, create_ip, device,
+				active_time, create_time, valid_type, valid_start_time, valid_end_time
+			)
+			VALUES (
+				'${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}',
+				'${device}', '${activeTime}', '${activeTime}', '${validity.validType}',
+				${validStartSql}, ${validEndSql}
+			)`
 
 			const accountSql = `INSERT INTO account (email, name, user_id)
 			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;

@@ -8,6 +8,11 @@ app.post('/regKey/add', async (c) => {
 	return c.json(result.ok());
 })
 
+app.post('/regKey/batchAdd', async (c) => {
+	const codes = await regKeyService.batchAdd(c, await c.req.json(), await userContext.getUserId(c));
+	return c.json(result.ok(codes));
+})
+
 app.get('/regKey/list', async (c) => {
 	const list = await regKeyService.list(c, c.req.query());
 	 return c.json(result.ok(list));

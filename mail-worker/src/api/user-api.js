@@ -19,6 +19,11 @@ app.put('/user/setStatus', async (c) => {
 	return c.json(result.ok());
 });
 
+app.put('/user/setValidity', async (c) => {
+	const data = await userService.setValidity(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
 app.put('/user/setType', async (c) => {
 	await userService.setType(c, await c.req.json());
 	return c.json(result.ok());

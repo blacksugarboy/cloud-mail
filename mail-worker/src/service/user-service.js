@@ -2,7 +2,7 @@ import BizError from '../error/biz-error';
 import accountService from './account-service';
 import orm from '../entity/orm';
 import user from '../entity/user';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
 import kvConst from '../const/kv-const';
 import KvConst from '../const/kv-const';
@@ -44,10 +44,17 @@ const userService = {
 		user.permKeys = permKeys;
 		user.role = roleRow;
 		user.type = userRow.type;
+		user.status = this.getEffectiveStatus(userRow, c.env.admin);
+		user.validType = userRow.validType;
+		user.validStartTime = userRow.validStartTime;
+		user.validEndTime = userRow.validEndTime;
 
 		if (c.env.admin === userRow.email) {
 			user.role = constant.ADMIN_ROLE
 			user.type = 0;
+			user.validType = userConst.validity.PERMANENT;
+			user.validStartTime = null;
+			user.validEndTime = null;
 		}
 
 		return user;
@@ -74,8 +81,81 @@ const userService = {
 	},
 
 	async insert(c, params) {
-		const { userId } = await orm(c).insert(user).values({ ...params }).returning().get();
+		const validity = params.email === c.env.admin
+			? this.buildValidity(userConst.validity.PERMANENT)
+			: this.buildValidity(
+				params.validType,
+				params.validStartTime,
+				params.validEndTime
+			);
+		const { userId } = await orm(c).insert(user).values({ ...params, ...validity }).returning().get();
 		return userId;
+	},
+
+	buildValidity(validType = userConst.validity.YEAR, validStartTime, validEndTime, baseTime = dayjs()) {
+		const presetTypes = [
+			userConst.validity.WEEK,
+			userConst.validity.MONTH,
+			userConst.validity.YEAR,
+			userConst.validity.PERMANENT
+		];
+
+		if (validType === userConst.validity.RANGE) {
+			const start = dayjs(validStartTime);
+			const end = dayjs(validEndTime);
+			if (!start.isValid() || !end.isValid() || !end.isAfter(start)) {
+				throw new BizError(t('invalidValidityRange'));
+			}
+			return {
+				validType,
+				validStartTime: start.format('YYYY-MM-DD HH:mm:ss'),
+				validEndTime: end.format('YYYY-MM-DD HH:mm:ss')
+			};
+		}
+
+		if (!presetTypes.includes(validType)) {
+			throw new BizError(t('invalidValidityType'));
+		}
+
+		if (validType === userConst.validity.PERMANENT) {
+			return {
+				validType,
+				validStartTime: null,
+				validEndTime: null
+			};
+		}
+
+		const start = dayjs(baseTime);
+		const unit = validType === userConst.validity.WEEK ? 'week' : validType;
+		return {
+			validType,
+			validStartTime: start.format('YYYY-MM-DD HH:mm:ss'),
+			validEndTime: start.add(1, unit).format('YYYY-MM-DD HH:mm:ss')
+		};
+	},
+
+	isUserValid(userRow, adminEmail) {
+		if (!userRow) {
+			return false;
+		}
+		if (userRow.email === adminEmail || userRow.validType === userConst.validity.PERMANENT) {
+			return true;
+		}
+		if (!userRow.validStartTime || !userRow.validEndTime) {
+			return false;
+		}
+		const now = dayjs();
+		const start = dayjs(userRow.validStartTime);
+		const end = dayjs(userRow.validEndTime);
+		return start.isValid() && end.isValid()
+			&& !now.isBefore(start)
+			&& !now.isAfter(end);
+	},
+
+	getEffectiveStatus(userRow, adminEmail) {
+		return this.isUserValid(userRow, adminEmail)
+			? userRow.status
+			: userConst.status.INVALID;
 	},
 
 	selectByEmailIncludeDel(c, email) {
@@ -123,8 +203,36 @@ const userService = {
 
 		const conditions = [];
 
+		const invalidValidity = and(
+			ne(user.email, c.env.admin),
+			or(
+				isNull(user.validType),
+				ne(user.validType, userConst.validity.PERMANENT)
+			),
+			or(
+				isNull(user.validStartTime),
+				isNull(user.validEndTime),
+				sql`datetime(${user.validStartTime}) > datetime(CURRENT_TIMESTAMP)`,
+				sql`datetime(${user.validEndTime}) < datetime(CURRENT_TIMESTAMP)`
+			)
+		);
+		const activeValidity = or(
+			eq(user.email, c.env.admin),
+			eq(user.validType, userConst.validity.PERMANENT),
+			and(
+				sql`datetime(${user.validStartTime}) <= datetime(CURRENT_TIMESTAMP)`,
+				sql`datetime(${user.validEndTime}) >= datetime(CURRENT_TIMESTAMP)`
+			)
+		);
+
+		status = Number(status);
 		if (status > -1) {
-			conditions.push(eq(user.status, status));
+			if (status === userConst.status.INVALID) {
+				conditions.push(invalidValidity);
+			} else {
+				conditions.push(eq(user.status, status));
+				conditions.push(activeValidity);
+			}
 			conditions.push(eq(user.isDel, isDel.NORMAL));
 		}
 
@@ -165,14 +273,15 @@ const userService = {
 
 		const types = [...new Set(list.map(user => user.type))];
 
-		const [emailCounts, delEmailCounts, sendCounts, delSendCounts, accountCounts, delAccountCounts, roleList] = await Promise.all([
+		const [emailCounts, delEmailCounts, sendCounts, delSendCounts, accountCounts, delAccountCounts, roleList, validityPermRoles] = await Promise.all([
 			emailService.selectUserEmailCountList(c, userIds, emailConst.type.RECEIVE),
 			emailService.selectUserEmailCountList(c, userIds, emailConst.type.RECEIVE, isDel.DELETE),
 			emailService.selectUserEmailCountList(c, userIds, emailConst.type.SEND),
 			emailService.selectUserEmailCountList(c, userIds, emailConst.type.SEND, isDel.DELETE),
 			accountService.selectUserAccountCountList(c, userIds),
 			accountService.selectUserAccountCountList(c, userIds, isDel.DELETE),
-			roleService.selectByIdsHasPermKey(c, types,'email:send')
+			roleService.selectByIdsHasPermKey(c, types,'email:send'),
+			roleService.selectByIdsHasPermKey(c, types,'user:set-validity')
 		]);
 
 		const receiveMap = Object.fromEntries(emailCounts.map(item => [item.userId, item.count]));
@@ -186,6 +295,8 @@ const userService = {
 		for (const user of list) {
 
 			const userId = user.userId;
+			user.accountStatus = user.status;
+			user.hasValidityPerm = validityPermRoles.some(roleRow => user.type === roleRow.roleId);
 
 			user.receiveEmailCount = receiveMap[userId] || 0;
 			user.sendEmailCount = sendMap[userId] || 0;
@@ -211,9 +322,14 @@ const userService = {
 				sendAction.sendCount = constant.ADMIN_ROLE.sendCount;
 				sendAction.hasPerm = true;
 				user.type = 0
+				user.validType = userConst.validity.PERMANENT;
+				user.validStartTime = null;
+				user.validEndTime = null;
+				user.hasValidityPerm = true;
 			}
 
 			user.sendAction = sendAction;
+			user.status = this.getEffectiveStatus(user, c.env.admin);
 		}
 
 		return { list, total };
@@ -268,6 +384,41 @@ const userService = {
 		}
 	},
 
+	async setValidity(c, params, operatorUserId) {
+		const { userId, validType, validStartTime, validEndTime } = params;
+		const targetUserId = Number(userId);
+		const [operator, target] = await Promise.all([
+			this.selectById(c, operatorUserId),
+			this.selectById(c, targetUserId)
+		]);
+
+		if (!operator || !target) {
+			throw new BizError(t('notExistUser'));
+		}
+		if (target.email === c.env.admin) {
+			throw new BizError(t('adminValidityPermanent'));
+		}
+		if (target.userId === operator.userId) {
+			throw new BizError(t('cannotSetOwnValidity'));
+		}
+
+		if (operator.email !== c.env.admin) {
+			const targetPermKeys = await permService.userPermKeys(c, target.userId);
+			if (targetPermKeys.includes('user:set-validity')) {
+				throw new BizError(t('cannotSetValidityPeer'));
+			}
+		}
+
+		const validity = this.buildValidity(validType, validStartTime, validEndTime);
+		await orm(c)
+			.update(user)
+			.set(validity)
+			.where(eq(user.userId, target.userId))
+			.run();
+		await c.env.kv.delete(KvConst.AUTH_INFO + target.userId);
+		return validity;
+	},
+
 	async setType(c, params) {
 
 		const { type, userId } = params;
@@ -304,7 +455,7 @@ const userService = {
 
 	async add(c, params) {
 
-		const { email, type, password } = params;
+		const { email, type, password, validType } = params;
 
 		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
@@ -332,7 +483,7 @@ const userService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
-		const userId = await userService.insert(c, { email, password: hash, salt, type });
+		const userId = await userService.insert(c, { email, password: hash, salt, type, validType });
 
 		await userService.updateUserInfo(c, userId, true);
 

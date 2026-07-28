@@ -67,17 +67,20 @@ const loginService = {
 
 		let type = null;
 		let regKeyId = 0
+		let validType = userConst.validity.YEAR;
 
 		if (regKey === settingConst.regKey.OPEN) {
 			const result = await this.handleOpenRegKey(c, regKey, code)
 			type = result?.type
 			regKeyId = result?.regKeyId
+			validType = result?.validType || validType
 		}
 
 		if (regKey === settingConst.regKey.OPTIONAL) {
 			const result = await this.handleOpenOptional(c, regKey, code)
 			type = result?.type
 			regKeyId = result?.regKeyId
+			validType = result?.validType || validType
 		}
 
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
@@ -128,7 +131,14 @@ const loginService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
-		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
+		const userId = await userService.insert(c, {
+			email,
+			regKeyId,
+			password: hash,
+			salt,
+			type: type || defType,
+			validType
+		});
 
 		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
 
@@ -164,7 +174,7 @@ const loginService = {
 		}
 
 		if (regKeyRow.count <= 0) {
-			throw new BizError(t('noRegKeyCount'));
+			throw new BizError(t('noRegKeyTotal'));
 		}
 
 		const today = toUtc().tz('Asia/Shanghai').startOf('day')
@@ -174,7 +184,11 @@ const loginService = {
 			throw new BizError(t('regKeyExpire'));
 		}
 
-		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
+		return {
+			type: regKeyRow.roleId,
+			regKeyId: regKeyRow.regKeyId,
+			validType: regKeyRow.userValidity || userConst.validity.YEAR
+		};
 	},
 
 	async handleOpenOptional(c, regKey, code) {
@@ -196,7 +210,11 @@ const loginService = {
 			return null
 		}
 
-		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
+		return {
+			type: regKeyRow.roleId,
+			regKeyId: regKeyRow.regKeyId,
+			validType: regKeyRow.userValidity || userConst.validity.YEAR
+		};
 	},
 
 	async login(c, params, noVerifyPwd = false) {
@@ -219,6 +237,10 @@ const loginService = {
 
 		if(userRow.status === userConst.status.BAN) {
 			throw new BizError(t('isBanUser'));
+		}
+
+		if (!userService.isUserValid(userRow, c.env.admin)) {
+			throw new BizError(t('invalidUserValidity'));
 		}
 
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {

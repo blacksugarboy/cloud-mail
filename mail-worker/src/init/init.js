@@ -29,21 +29,50 @@ const dbInit = {
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
+		await this.v3_1DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
 
-	async v3_0DB(c) {
-		try {
-			await c.env.db.batch([
-				await c.env.db.prepare(`ALTER TABLE email ADD COLUMN code TEXT NOT NULL DEFAULT '';`),
-				await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN ai_code INTEGER NOT NULL DEFAULT 1;`),
-				await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN ai_code_filter TEXT NOT NULL DEFAULT '';`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
+	async v3_1DB(c) {
+		const statements = [
+			`ALTER TABLE user ADD COLUMN valid_type TEXT;`,
+			`ALTER TABLE user ADD COLUMN valid_start_time DATETIME;`,
+			`ALTER TABLE user ADD COLUMN valid_end_time DATETIME;`,
+			`ALTER TABLE reg_key ADD COLUMN user_validity TEXT NOT NULL DEFAULT 'year';`,
+			`ALTER TABLE email DROP COLUMN code;`,
+			`ALTER TABLE setting DROP COLUMN ai_code;`,
+			`ALTER TABLE setting DROP COLUMN ai_code_filter;`
+		];
+
+		for (const statement of statements) {
+			try {
+				await c.env.db.prepare(statement).run();
+			} catch (e) {
+				console.warn(`跳过字段：${e.message}`);
+			}
 		}
 
+		await c.env.db.prepare(`
+			UPDATE user
+			SET valid_type = 'permanent', valid_start_time = NULL, valid_end_time = NULL
+			WHERE valid_type IS NULL OR valid_type = ''
+		`).run();
+
+		await c.env.db.prepare(`
+			UPDATE user
+			SET valid_type = 'permanent', valid_start_time = NULL, valid_end_time = NULL
+			WHERE email = ?
+		`).bind(c.env.admin).run();
+
+		await c.env.db.prepare(`
+			INSERT INTO perm (name, perm_key, pid, type, sort)
+			SELECT '有效期修改', 'user:set-validity', 6, 2, 5
+			WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'user:set-validity')
+		`).run();
+	},
+
+	async v3_0DB(c) {
 		try {
 			await c.env.db.batch([
 				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN black_subject TEXT NOT NULL DEFAULT '';`),
@@ -254,6 +283,7 @@ const dbInit = {
 				role_id INTEGER NOT NULL DEFAULT 0,
 				user_id INTEGER NOT NULL DEFAULT 0,
 				expire_time DATETIME,
+				user_validity TEXT NOT NULL DEFAULT 'year',
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `).run();
@@ -572,6 +602,9 @@ const dbInit = {
 			status INTEGER DEFAULT 0 NOT NULL,
 			create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 			active_time DATETIME,
+			valid_type TEXT,
+			valid_start_time DATETIME,
+			valid_end_time DATETIME,
 			is_del INTEGER DEFAULT 0 NOT NULL
 		  )
 		`).run();

@@ -13,6 +13,10 @@ export function userSetStatus(params) {
     return http.put('/user/setStatus', params)
 }
 
+export function userSetValidity(params) {
+    return http.put('/user/setValidity', params)
+}
+
 export function userSetType(params) {
     return http.put('/user/setType', params)
 }

@@ -135,10 +135,6 @@ const settingService = {
 			params.emailPrefixFilter = params.emailPrefixFilter + '';
 		}
 
-		if (Array.isArray(params.aiCodeFilter)) {
-			params.aiCodeFilter = params.aiCodeFilter + '';
-		}
-
 		params.resendTokens = JSON.stringify(resendTokens);
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);

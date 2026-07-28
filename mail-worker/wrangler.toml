@@ -22,9 +22,6 @@ enabled = true
 #[[send_email]]
 #name = "email"			#CF发件, 配置后优先使用
 
-[ai]
-binding = "ai"
-
 [assets]
 binding = "assets"		#静态资源绑定名默认不可修改
 directory = "./dist"	#前端vue项目打包的静态资源存放位置,默认dist
@@ -36,7 +33,6 @@ crons = ["0 16 * * *"]	#每天晚上12点执行每日任务,刷新分析缓存
 
 
 [vars]
-#ai_model = ""			#ai模型,不填默认使用@cf/meta/llama-3.1-8b-instruct
 #analysis_cache = false			#是否开启分析数据缓存
 #orm_log = false			#是否sql日志
 #domain = []				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]

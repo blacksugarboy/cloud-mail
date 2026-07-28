@@ -51,13 +51,15 @@ With only one domain, you can create multiple different email addresses, similar
 
 - **🛡️ Admin Features**: Admin controls for user and email management with RBAC-based access control.
 
+- **🔑 Invite Code Management**: Configure a single code for multiple uses or batch-generate one-time invite codes.
+
+- **⏳ User Validity**: Supports one week, one month, one year, permanent, and custom date ranges with a dedicated permission for validity changes.
+
 - **📦 Attachment Support**: Send and receive attachments, stored and downloaded via R2 object storage.
 
 - **🔔 Email Push**: Forward received emails to Telegram bots or other email providers.
 
 - **📡 Open API**: Supports batch user creation via API and multi-condition email queries
-
-- **🔢 Verification Code Recognition**: Auto-detect codes via Workers AI
 
 - **📈 Data Visualization**: Use ECharts to visualize system data, including user email growth.
 

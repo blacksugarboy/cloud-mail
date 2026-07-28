@@ -82,7 +82,6 @@
                   <div class="email-text">
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
                       <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
-                      <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
                           {{ item.subject || '\u200B' }}
@@ -155,14 +154,6 @@
     >
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item v-if="rightClickEmail.code" @click="copyCode(rightClickEmail.code)" >
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="fluent-color:clipboard-24" width="20" height="20" />
-                <span>{{t('copyCode')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
           <el-dropdown-item v-if="['email'].includes(props.type)" @click="emailRead(rightClickEmail.emailId)" >
             <template #default>
               <div class="right-dropdown-item">
@@ -667,24 +658,6 @@ function handleSearch(type, value) {
   emit('right-search', type, value);
 }
 
-async function copyCode(code) {
-  try {
-    await navigator.clipboard.writeText(code);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true
-    })
-  } catch (err) {
-    console.error(`${t('copyFailMsg')}:`, err);
-    ElMessage({
-      message: t('copyFailMsg'),
-      type: 'error',
-      plain: true
-    })
-  }
-}
-
 function handleDelete() {
   ElMessageBox.confirm(t('delEmailsConfirm'), {
     confirmButtonText: t('confirm'),
@@ -1177,19 +1150,6 @@ function loadData() {
         @media (min-width: 1367px) {
           padding-left: 5px;
         }
-      }
-
-      .code-tag {
-        flex: 0 0 auto;
-        max-width: 170px;
-        height: 20px;
-        line-height: 20px;
-        font-size: 14px;
-        color: var(--el-text-color-primary);
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        cursor: pointer;
       }
 
       .subject-text {

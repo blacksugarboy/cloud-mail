@@ -17,6 +17,9 @@ const user = sqliteTable('user', {
 	sort: text('sort').default(0),
 	sendCount: text('send_count').default(0),
 	regKeyId: integer('reg_key_id').default(0).notNull(),
+	validType: text('valid_type').default('permanent'),
+	validStartTime: text('valid_start_time'),
+	validEndTime: text('valid_end_time'),
 	isDel: integer('is_del').default(0).notNull()
 });
 export default user

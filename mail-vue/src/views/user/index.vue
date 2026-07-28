@@ -13,9 +13,10 @@
       <el-select v-model="params.status" placeholder="Select" class="status-select"
                  :style="`width: ${locale === 'en' ? 95 : 80 }px`">
         <el-option :key="-1" :label="$t('all')" :value="-1"/>
-        <el-option :key="0" :label="$t('active')" :value="0"/>
-        <el-option :key="1" :label="$t('banned')" :value="1"/>
-        <el-option :key="-2" :label="$t('deleted')" :value="-2"/>
+         <el-option :key="0" :label="$t('active')" :value="0"/>
+         <el-option :key="1" :label="$t('banned')" :value="1"/>
+         <el-option :key="2" :label="$t('invalid')" :value="2"/>
+         <el-option :key="-2" :label="$t('deleted')" :value="-2"/>
       </el-select>
       <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
       <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
@@ -70,8 +71,9 @@
           <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
             <template #default="props">
               <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
-              <el-tag disable-transitions v-else-if="props.row.status === 0" type="primary">{{ $t('active') }}</el-tag>
-              <el-tag disable-transitions v-else-if="props.row.status === 1" type="danger">{{ $t('banned') }}</el-tag>
+               <el-tag disable-transitions v-else-if="props.row.status === 0" type="primary">{{ $t('active') }}</el-tag>
+               <el-tag disable-transitions v-else-if="props.row.status === 1" type="danger">{{ $t('banned') }}</el-tag>
+               <el-tag disable-transitions v-else-if="props.row.status === 2" type="warning">{{ $t('invalid') }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column v-if="typeShow" :label="$t('tabRole')" min-width="140" prop="type">
@@ -88,8 +90,11 @@
                 <el-button size="small" type="primary">{{ $t('action') }}</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
-                    <el-dropdown-item @click="openSetType(props.row)" >{{ $t('perm') }}</el-dropdown-item>
+                     <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
+                     <el-dropdown-item @click="openSetType(props.row)" >{{ $t('perm') }}</el-dropdown-item>
+                     <el-dropdown-item v-if="canEditValidity(props.row)" @click="openSetValidity(props.row)">
+                       {{ $t('changeValidity') }}
+                     </el-dropdown-item>
                     <template v-if="props.row.type !== 0">
                       <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
                         {{ setStatusName(props.row) }}
@@ -152,8 +157,29 @@
         >{{ $t('save') }}
         </el-button>
       </div>
-    </el-dialog>
-    <el-dialog v-model="showAdd" :title="$t('addUser')" @closed="resetAddForm">
+     </el-dialog>
+     <el-dialog class="dialog" v-model="setValidityShow" :title="$t('changeValidity')" @closed="resetValidityForm">
+       <div class="dialog-box">
+         <el-radio-group v-model="validityMode">
+           <el-radio-button value="preset">{{ $t('presetDuration') }}</el-radio-button>
+           <el-radio-button value="range">{{ $t('dateRange') }}</el-radio-button>
+         </el-radio-group>
+         <el-select v-if="validityMode === 'preset'" v-model="validityForm.validType">
+           <el-option v-for="item in validityOptions" :key="item.value" :label="$t(item.label)" :value="item.value"/>
+         </el-select>
+         <el-date-picker
+             v-else
+             v-model="validityForm.range"
+             type="datetimerange"
+             :start-placeholder="$t('validFrom')"
+             :end-placeholder="$t('validUntil')"
+         />
+         <el-button class="btn" :loading="settingLoading" type="primary" @click="setValidity">
+           {{ $t('save') }}
+         </el-button>
+       </div>
+     </el-dialog>
+     <el-dialog v-model="showAdd" :title="$t('addUser')" @closed="resetAddForm">
       <div class="container">
         <el-input v-model="addForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
           <template #append>
@@ -179,9 +205,12 @@
           </template>
         </el-input>
         <el-input type="password" v-model="addForm.password" :placeholder="$t('password')"/>
-        <el-select v-model="addForm.type" :placeholder="$t('perm')">
-          <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
-        </el-select>
+         <el-select v-model="addForm.type" :placeholder="$t('perm')">
+           <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
+         </el-select>
+         <el-select v-model="addForm.validType" :placeholder="$t('userValidity')">
+           <el-option v-for="item in validityOptions" :key="item.value" :label="$t(item.label)" :value="item.value"/>
+         </el-select>
         <el-button class="btn" type="primary" @click="submit" :loading="addLoading"
         >{{ $t('add') }}
         </el-button>
@@ -253,9 +282,14 @@
           <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
           <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}
           </el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}
-          </el-tag>
-        </div>
+           <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}
+           </el-tag>
+           <el-tag disable-transitions v-else-if="userDetails.status === 2" type="warning">{{ $t('invalid') }}
+           </el-tag>
+         </div>
+         <div>
+           <span class="details-item-title">{{ $t('userValidity') }}:</span>{{ formatValidity(userDetails) }}
+         </div>
         <div><span class="details-item-title">{{ $t('registrationIp') }}:</span>{{
             userDetails.createIp || $t('unknown')
           }}
@@ -320,11 +354,19 @@
                 <span>{{ t('setRole') }}</span>
               </div>
             </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="rightClickUser.type !== 0">
+           </el-dropdown-item>
+           <el-dropdown-item v-if="canEditValidity(rightClickUser)" @click="openSetValidity(rightClickUser)">
+             <template #default>
+               <div class="right-dropdown-item">
+                 <Icon icon="ion:calendar-outline" width="20" height="20"/>
+                 <span>{{ t('changeValidity') }}</span>
+               </div>
+             </template>
+           </el-dropdown-item>
+           <el-dropdown-item v-if="rightClickUser.type !== 0">
             <template #default>
               <div class="right-dropdown-item" v-if="rightClickUser.isDel !== 1" @click="setStatus(rightClickUser)" >
-                <Icon icon="ion:reload" v-if="rightClickUser.status" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
+                <Icon icon="ion:reload" v-if="rightClickUser.accountStatus" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <Icon icon="ion:ban-outline" v-else style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <span>{{ setRightStatusName(rightClickUser) }}</span>
               </div>
@@ -371,6 +413,7 @@ import {
   userDelete,
   userSetPwd,
   userSetStatus,
+  userSetValidity,
   userSetType,
   userAdd,
   userRestSendCount,
@@ -387,6 +430,7 @@ import {isEmail} from "@/utils/verify-utils.js";
 import {useRoleStore} from "@/store/role.js";
 import {useUserStore} from "@/store/user.js";
 import {useI18n} from 'vue-i18n';
+import {hasPerm} from "@/perm/perm.js";
 
 defineOptions({
   name: 'user'
@@ -441,6 +485,7 @@ const addForm = reactive({
   suffix: settingStore.domainList[0],
   password: '',
   type: null,
+  validType: 'year',
 })
 
 const params = reactive({
@@ -456,12 +501,25 @@ const userForm = reactive({
   type: -1,
   userId: 0,
 })
+const validityOptions = [
+  {value: 'week', label: 'oneWeek'},
+  {value: 'month', label: 'oneMonth'},
+  {value: 'year', label: 'oneYear'},
+  {value: 'permanent', label: 'permanent'}
+]
+const validityMode = ref('preset')
+const validityForm = reactive({
+  userId: 0,
+  validType: 'year',
+  range: []
+})
 
 const showAdd = ref(false)
 const accountShow = ref(false)
 const addLoading = ref(false);
 const setTypeShow = ref(false)
 const setPwdShow = ref(false)
+const setValidityShow = ref(false)
 const pagerCount = ref(10)
 const settingLoading = ref(false)
 const tableLoading = ref(true)
@@ -662,14 +720,14 @@ function formatterReceive(e) {
 
 function setStatusName(user) {
   if (user.isDel === 1) return t('restore')
-  if (user.status === 0) return t('btnBan')
-  if (user.status === 1) return t('enable')
+  if (user.accountStatus === 0) return t('btnBan')
+  if (user.accountStatus === 1) return t('enable')
 }
 
 function setRightStatusName(user) {
   if (user.isDel === 1) return t('adminDeleteUser')
-  if (user.status === 0) return t('banUser')
-  if (user.status === 1) return t('enableUser')
+  if (user.accountStatus === 0) return t('banUser')
+  if (user.accountStatus === 1) return t('enableUser')
 }
 
 const tableRowFormatter = (data) => {
@@ -685,6 +743,7 @@ function resetAddForm() {
   addForm.suffix = settingStore.domainList[0]
   addForm.type = null
   addForm.password = ''
+  addForm.validType = 'year'
 }
 
 function openAdd() {
@@ -883,15 +942,79 @@ function setStatus(user) {
 }
 
 function httpSetStatus(user) {
-  let status = user.status ? 0 : 1
+  let status = user.accountStatus ? 0 : 1
   userSetStatus({status: status, userId: user.userId}).then(() => {
-    user.status = status
+    user.accountStatus = status
+    user.status = user.status === 2 ? 2 : status
     ElMessage({
       message: t('saveSuccessMsg'),
       type: "success",
       plain: true
     })
   })
+}
+
+function canEditValidity(user) {
+  if (!hasPerm('user:set-validity') || !user || user.type === 0) {
+    return false
+  }
+  if (user.userId === userStore.user.userId) {
+    return false
+  }
+  return userStore.user.type === 0 || !user.hasValidityPerm
+}
+
+function openSetValidity(user) {
+  validityForm.userId = user.userId
+  validityMode.value = user.validType === 'range' ? 'range' : 'preset'
+  validityForm.validType = validityOptions.some(item => item.value === user.validType)
+      ? user.validType
+      : 'year'
+  validityForm.range = user.validType === 'range' && user.validStartTime && user.validEndTime
+      ? [new Date(user.validStartTime + 'Z'), new Date(user.validEndTime + 'Z')]
+      : []
+  setValidityShow.value = true
+}
+
+function resetValidityForm() {
+  validityMode.value = 'preset'
+  validityForm.userId = 0
+  validityForm.validType = 'year'
+  validityForm.range = []
+}
+
+function setValidity() {
+  const form = {
+    userId: validityForm.userId,
+    validType: validityMode.value === 'range' ? 'range' : validityForm.validType
+  }
+  if (validityMode.value === 'range') {
+    if (!validityForm.range || validityForm.range.length !== 2) {
+      ElMessage({message: t('emptyValidityRange'), type: 'error', plain: true})
+      return
+    }
+    form.validStartTime = validityForm.range[0]
+    form.validEndTime = validityForm.range[1]
+  }
+
+  settingLoading.value = true
+  userSetValidity(form).then(() => {
+    setValidityShow.value = false
+    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
+    getUserList(false)
+  }).finally(() => {
+    settingLoading.value = false
+  })
+}
+
+function formatValidity(user) {
+  if (user.type === 0 || user.validType === 'permanent') {
+    return t('permanent')
+  }
+  if (!user.validStartTime || !user.validEndTime) {
+    return t('invalid')
+  }
+  return `${tzDayjs(user.validStartTime).format('YYYY-MM-DD HH:mm')} ${t('to')} ${tzDayjs(user.validEndTime).format('YYYY-MM-DD HH:mm')}`
 }
 
 function setType() {

@@ -22,9 +22,6 @@ id = "${KV_NAMESPACE_ID}"
 binding = "r2"
 bucket_name = "${R2_BUCKET_NAME}"
 
-[ai]
-binding = "ai"
-
 [assets]
 binding = "assets"
 directory = "./dist"
@@ -36,7 +33,6 @@ crons = ["0 16 * * *"]
 
 
 [vars]
-ai_model = "${AI_MODEL}"
 analysis_cache = "${ANALYSIS_CACHE}"
 #orm_log = false
 domain = "${DOMAIN}"

@@ -52,13 +52,17 @@
                   <el-tag v-else>{{ sendType }}</el-tag>
                 </div>
                 <div>
-                  <el-tag v-if="settingStore.settings.manyEmail || settingStore.settings.addEmail">
-                    {{ $t('disabled') }}
-                  </el-tag>
-                  <span v-else-if="accountCount && hasPerm('account:add')"
-                        style="margin-right: 5px">{{ $t('totalUserAccount', {msg: accountCount}) }}</span>
-                  <el-tag v-else-if="!accountCount && hasPerm('account:add')">{{ $t('unlimited') }}</el-tag>
+                  <el-tag v-if="settingStore.settings.manyEmail === 1">{{ $t('addDisabled') }}</el-tag>
                   <el-tag v-else-if="!hasPerm('account:add')">{{ $t('unauthorized') }}</el-tag>
+                  <template v-else>
+                    <span v-if="accountCount" style="margin-right: 5px">
+                      {{ $t('accountUsage', {current: accountTotal, limit: accountCount}) }}
+                    </span>
+                    <el-tag v-else>{{ $t('unlimited') }}</el-tag>
+                    <el-tag v-if="settingStore.settings.addEmail === 1" class="code-only-tag" type="warning">
+                      {{ $t('inviteCodeOnly') }}
+                    </el-tag>
+                  </template>
                 </div>
               </div>
             </div>
@@ -97,6 +101,10 @@ const userinfoRef = ref({})
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
+})
+
+const accountTotal = computed(() => {
+  return Number(userStore.user.accountTotal) || 0
 })
 
 const sendType = computed(() => {
@@ -309,6 +317,10 @@ function formatName(email) {
       > div {
         display: flex;
         align-items: center;
+      }
+
+      .code-only-tag {
+        margin-left: 5px;
       }
     }
   }

@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import regKey from '../entity/reg-key';
-import { inArray, like, eq, desc, sql, or } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, or, sql } from 'drizzle-orm';
 import roleService from './role-service';
 import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
@@ -129,6 +129,33 @@ const regKeyService = {
 		return orm(c).select().from(regKey).where(eq(regKey.code, code)).get();
 	},
 
+	async validateForAccountAdd(c, code) {
+		const regKeyRow = await this.selectByCode(c, code);
+
+		if (!regKeyRow) {
+			throw new BizError(t('notExistRegKey'));
+		}
+
+		if (regKeyRow.count <= 0) {
+			throw new BizError(t('noRegKeyTotal'));
+		}
+
+		const today = toUtc().tz('Asia/Shanghai').startOf('day');
+		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
+
+		if (expireTime.isBefore(today)) {
+			throw new BizError(t('regKeyExpire'));
+		}
+
+		const defaultRole = await roleService.selectDefaultRole(c);
+
+		if (!defaultRole || regKeyRow.roleId !== defaultRole.roleId) {
+			throw new BizError(t('accountRegKeyDefaultRoleOnly'));
+		}
+
+		return regKeyRow;
+	},
+
 	async list(c, params) {
 
 		const {code} = params
@@ -159,9 +186,21 @@ const regKeyService = {
 	},
 
 	async reduceCount(c, code, count) {
-		await orm(c).update(regKey).set({
+		const result = await orm(c).update(regKey).set({
 			count: sql`${regKey.count}
 	  -
+	  ${count}`
+		}).where(and(
+			eq(regKey.code, code),
+			gte(regKey.count, count)
+		)).run();
+		return (result.meta?.changes ?? result.changes ?? 0) > 0;
+	},
+
+	async increaseCount(c, code, count) {
+		await orm(c).update(regKey).set({
+			count: sql`${regKey.count}
+	  +
 	  ${count}`
 		}).where(eq(regKey.code, code)).run();
 	},

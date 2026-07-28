@@ -127,10 +127,14 @@
                     <el-option :label="$t('btnBan')" value="ban"/>
                   </el-select>
               </span>
-              <span class="send-num" v-if="data.permKey === 'account:add'" @click.stop>
-                <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
-                                 size="small" :placeholder="$t('total')">
-                </el-input-number>
+              <span class="send-num"
+                    v-if="data.permKey === 'account:add' && settingStore.settings.manyEmail === 0"
+                    @click.stop>
+                <el-tooltip :content="$t('roleAccountLimitHint')" placement="top">
+                  <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
+                                   size="small" :placeholder="$t('total')">
+                  </el-input-number>
+                </el-tooltip>
               </span>
             </div>
           </template>
@@ -157,7 +161,8 @@ defineOptions({
   name: 'role'
 })
 
-const {domainList} = useSettingStore();
+const settingStore = useSettingStore();
+const {domainList} = settingStore;
 const {t, locale} = useI18n();
 const userStore = useUserStore();
 const roleStore = useRoleStore();
@@ -344,7 +349,7 @@ function openRoleSet(role) {
   form.description = role.description
   form.sendType = role.sendType
   form.sendCount = role.sendCount
-  form.accountCount = role.accountCount
+  form.accountCount = role.accountCount ?? 0
   form.banEmail = role.banEmail
   form.availDomain = role.availDomain
   nextTick(() => {

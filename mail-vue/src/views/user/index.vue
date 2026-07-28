@@ -68,6 +68,21 @@
               {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
             </template>
           </el-table-column>
+          <el-table-column :label="$t('userValidity')" min-width="200" prop="validEndTime">
+            <template #default="props">
+              <el-tag v-if="props.row.type === 0 || props.row.validType === 'permanent'" type="success">
+                {{ $t('permanent') }}
+              </el-tag>
+              <span
+                  v-else-if="props.row.validStartTime && props.row.validEndTime"
+                  class="validity-period"
+                  :title="formatValidity(props.row)"
+              >
+                {{ formatValidityPeriod(props.row) }}
+              </span>
+              <el-tag v-else type="warning">{{ $t('invalid') }}</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
             <template #default="props">
               <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
@@ -158,27 +173,30 @@
         </el-button>
       </div>
      </el-dialog>
-     <el-dialog class="dialog" v-model="setValidityShow" :title="$t('changeValidity')" @closed="resetValidityForm">
-       <div class="dialog-box">
-         <el-radio-group v-model="validityMode">
-           <el-radio-button value="preset">{{ $t('presetDuration') }}</el-radio-button>
-           <el-radio-button value="range">{{ $t('dateRange') }}</el-radio-button>
-         </el-radio-group>
-         <el-select v-if="validityMode === 'preset'" v-model="validityForm.validType">
-           <el-option v-for="item in validityOptions" :key="item.value" :label="$t(item.label)" :value="item.value"/>
-         </el-select>
-         <el-date-picker
-             v-else
-             v-model="validityForm.range"
-             type="datetimerange"
-             :start-placeholder="$t('validFrom')"
-             :end-placeholder="$t('validUntil')"
-         />
-         <el-button class="btn" :loading="settingLoading" type="primary" @click="setValidity">
-           {{ $t('save') }}
-         </el-button>
-       </div>
-     </el-dialog>
+    <el-dialog class="dialog validity-dialog" v-model="setValidityShow" :title="$t('changeValidity')"
+               @closed="resetValidityForm">
+      <div class="dialog-box validity-dialog-box">
+        <el-radio-group v-model="validityMode" class="validity-mode">
+          <el-radio-button value="preset">{{ $t('presetDuration') }}</el-radio-button>
+          <el-radio-button value="range">{{ $t('dateRange') }}</el-radio-button>
+        </el-radio-group>
+        <el-select v-if="validityMode === 'preset'" v-model="validityForm.validType" class="validity-control">
+          <el-option v-for="item in validityOptions" :key="item.value" :label="$t(item.label)" :value="item.value"/>
+        </el-select>
+        <el-date-picker
+            v-else
+            v-model="validityForm.range"
+            class="validity-control validity-range-picker"
+            type="datetimerange"
+            unlink-panels
+            :start-placeholder="$t('validFrom')"
+            :end-placeholder="$t('validUntil')"
+        />
+        <el-button class="btn" :loading="settingLoading" type="primary" @click="setValidity">
+          {{ $t('save') }}
+        </el-button>
+      </div>
+    </el-dialog>
      <el-dialog v-model="showAdd" :title="$t('addUser')" @closed="resetAddForm">
       <div class="container">
         <el-input v-model="addForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
@@ -1017,6 +1035,12 @@ function formatValidity(user) {
   return `${tzDayjs(user.validStartTime).format('YYYY-MM-DD HH:mm')} ${t('to')} ${tzDayjs(user.validEndTime).format('YYYY-MM-DD HH:mm')}`
 }
 
+function formatValidityPeriod(user) {
+  const start = tzDayjs(user.validStartTime).format('YYYY-MM-DD')
+  const end = tzDayjs(user.validEndTime).format('YYYY-MM-DD')
+  return `${start} ~ ${end}`
+}
+
 function setType() {
   settingLoading.value = true
   userSetType({type: userForm.type, userId: userForm.userId}).then(() => {
@@ -1205,6 +1229,16 @@ function adjustWidth() {
   }
 }
 
+:deep(.validity-dialog) {
+  width: 480px !important;
+
+  @media (max-width: 520px) {
+    width: calc(100% - 40px) !important;
+    margin-right: 20px !important;
+    margin-left: 20px !important;
+  }
+}
+
 .header-actions {
   padding: 9px 15px;
   display: flex;
@@ -1319,6 +1353,43 @@ function adjustWidth() {
       margin-top: 15px;
     }
   }
+}
+
+.validity-dialog-box {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+
+  .validity-mode,
+  .validity-control {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .validity-mode {
+    display: flex;
+
+    :deep(.el-radio-button) {
+      flex: 1;
+    }
+
+    :deep(.el-radio-button__inner) {
+      width: 100%;
+    }
+  }
+
+  .validity-range-picker {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .el-button {
+    margin-top: 0 !important;
+  }
+}
+
+.validity-period {
+  white-space: nowrap;
 }
 
 .select {

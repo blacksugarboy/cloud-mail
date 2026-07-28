@@ -13,19 +13,25 @@
 import account from '@/layout/account/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
+import {useUserStore} from "@/store/user.js";
 import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
 
 const settingStore = useSettingStore()
+const userStore = useUserStore()
 const uiStore = useUiStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 
 let elNotification = null
 
+const accountSidebarAvailable = computed(() => {
+  return settingStore.settings.manyEmail === 0 || Number(userStore.user.accountTotal) > 1
+})
+
 const accountShow = computed(() => {
-  return uiStore.accountShow && settingStore.settings.manyEmail === 0
+  return uiStore.accountShow && accountSidebarAvailable.value
 })
 
 watch(() => uiStore.changeNotice, () => {

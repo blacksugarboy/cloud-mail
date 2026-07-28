@@ -12,6 +12,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import regKeyService from './reg-key-service';
 
 const accountService = {
 
@@ -19,10 +20,14 @@ const accountService = {
 
 		const { addEmailVerify , addEmail, manyEmail, addVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
 
-		let { email, token } = params;
+		let { email, token, code } = params;
+		code = typeof code === 'string' ? code.trim() : '';
 
+		if (manyEmail !== settingConst.manyEmail.OPEN) {
+			throw new BizError(t('manyAccountDisabled'));
+		}
 
-		if (!(addEmail === settingConst.addEmail.OPEN && manyEmail === settingConst.manyEmail.OPEN)) {
+		if (!code && addEmail !== settingConst.addEmail.OPEN) {
 			throw new BizError(t('addAccountDisabled'));
 		}
 
@@ -73,6 +78,10 @@ const accountService = {
 
 		}
 
+		if (code) {
+			await regKeyService.validateForAccountAdd(c, code);
+		}
+
 		let addVerifyOpen = false
 
 		if (addEmailVerify === settingConst.addEmailVerify.OPEN) {
@@ -88,7 +97,23 @@ const accountService = {
 		}
 
 
-		accountRow = await orm(c).insert(account).values({ email: email, userId: userId, name: emailUtils.getName(email) }).returning().get();
+		let codeConsumed = false;
+
+		if (code) {
+			codeConsumed = await regKeyService.reduceCount(c, code, 1);
+			if (!codeConsumed) {
+				throw new BizError(t('noRegKeyTotal'));
+			}
+		}
+
+		try {
+			accountRow = await orm(c).insert(account).values({ email: email, userId: userId, name: emailUtils.getName(email) }).returning().get();
+		} catch (error) {
+			if (codeConsumed) {
+				await regKeyService.increaseCount(c, code, 1);
+			}
+			throw error;
+		}
 
 		if (addEmailVerify === settingConst.addEmailVerify.COUNT && !addVerifyOpen) {
 			const row = await verifyRecordService.increaseAddCount(c);

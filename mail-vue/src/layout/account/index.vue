@@ -1,7 +1,8 @@
 <template>
   <div class="account-box">
     <div class="head-opt">
-      <Icon v-perm="'account:add'" class="icon add" icon="ion:add-outline" width="23" height="23" @click="add"/>
+      <Icon v-if="settingStore.settings.manyEmail === 0" v-perm="'account:add'" class="icon add"
+            icon="ion:add-outline" width="23" height="23" @click="add"/>
       <Icon class="icon refresh" icon="ion:reload" width="18" height="18" @click="refresh"/>
     </div>
     <el-scrollbar class="scrollbar" ref="scrollbarRef">
@@ -75,7 +76,7 @@
       </div>
 
     </el-scrollbar>
-    <el-dialog v-model="showAdd" :title="$t('addAccount')">
+    <el-dialog v-model="showAdd" :title="$t('addAccount')" @closed="resetAddForm">
       <div class="container">
         <el-input v-model="addForm.email" ref="addRef" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
           <template #append>
@@ -100,6 +101,21 @@
             </div>
           </template>
         </el-input>
+        <el-input
+            v-model="addForm.code"
+            class="add-email-code"
+            clearable
+            type="text"
+            :placeholder="$t('regKeyOptional')"
+            autocomplete="off"
+        />
+        <div class="add-email-hints">
+          <div>{{ $t('addEmailWithoutCodeHint') }}</div>
+          <div>{{ $t('addEmailWithCodeHint') }}</div>
+          <div class="add-email-warning" v-if="settingStore.settings.addEmail === 1 && !addForm.code.trim()">
+            {{ $t('addEmailDisabledCodeHint') }}
+          </div>
+        </div>
         <el-button class="btn" type="primary" @click="submit" :loading="addLoading"
         >{{ $t('add') }}
         </el-button>
@@ -172,7 +188,8 @@ let verifyErrorCount = 0
 let first = true
 const addForm = reactive({
   email: '',
-  suffix: settingStore.domainList[0]
+  suffix: settingStore.domainList[0],
+  code: ''
 })
 let skeletonRows = 10
 const queryParams = {
@@ -319,6 +336,7 @@ function remove(account) {
         type: 'success',
         plain: true,
       })
+      userStore.refreshUserInfo()
     })
   });
 }
@@ -349,6 +367,13 @@ function add() {
   setTimeout(() => {
     addRef.value.focus()
   }, 100)
+}
+
+function resetAddForm() {
+  addForm.email = ''
+  addForm.code = ''
+  verifyToken = ''
+  verifyShow.value = false
 }
 
 function setAsTop(account, index) {
@@ -454,6 +479,24 @@ function submit() {
     return
   }
 
+  if (settingStore.settings.manyEmail !== 0) {
+    ElMessage({
+      message: t('manyEmailAddDisabledMsg'),
+      type: "warning",
+      plain: true
+    })
+    return
+  }
+
+  if (!addForm.code.trim() && settingStore.settings.addEmail !== 0) {
+    ElMessage({
+      message: t('addEmailDisabledCodeMsg'),
+      type: "warning",
+      plain: true
+    })
+    return
+  }
+
   if (!verifyToken && (settingStore.settings.addEmailVerify === 0 || (settingStore.settings.addEmailVerify === 2 && settingStore.settings.addVerifyOpen))) {
     if (!verifyShow.value) {
       verifyShow.value = true
@@ -480,12 +523,10 @@ function submit() {
   }
 
   addLoading.value = true
-  accountAdd(addForm.email + addForm.suffix, verifyToken).then(account => {
+  accountAdd(addForm.email + addForm.suffix, verifyToken, addForm.code.trim()).then(account => {
     addLoading.value = false
     showAdd.value = false
-    addForm.email = ''
     accounts.push(account)
-    verifyToken = ''
     settingStore.settings.addVerifyOpen = account.addVerifyOpen
     ElMessage({
       message: t('addSuccessMsg'),
@@ -623,6 +664,23 @@ path[fill="#ffdda1"] {
 
   .item-choose {
     background: var(--choose-account-background);
+  }
+}
+
+.add-email-code {
+  margin-top: 12px;
+}
+
+.add-email-hints {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+
+  .add-email-warning {
+    color: var(--el-color-warning);
   }
 }
 

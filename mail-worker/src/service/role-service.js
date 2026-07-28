@@ -16,6 +16,7 @@ const roleService = {
 	async add(c, params, userId) {
 
 		let { name, permIds, banEmail, availDomain } = params;
+		params.accountCount = this.validateAccountCount(params.accountCount);
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -65,6 +66,7 @@ const roleService = {
 	async setRole(c, params) {
 
 		let { name, permIds, roleId, banEmail, availDomain } = params;
+		params.accountCount = this.validateAccountCount(params.accountCount);
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -173,6 +175,14 @@ const roleService = {
 
 	selectByName(c, roleName) {
 		return orm(c).select().from(role).where(eq(role.name, roleName)).get();
+	},
+
+	validateAccountCount(accountCount) {
+		accountCount = Number(accountCount ?? 0);
+		if (!Number.isInteger(accountCount) || accountCount < 0 || accountCount > 99999) {
+			throw new BizError(t('invalidAccountCount'));
+		}
+		return accountCount;
 	},
 
 	selectByUserIds(c, userIds) {

@@ -43,7 +43,12 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>{{ $t('addAccount') }}</span></div>
+                <div>
+                  <span>{{ $t('addAccount') }}</span>
+                  <el-tooltip effect="dark" :content="$t('addEmailSettingDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div>
                   <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
                              v-model="setting.addEmail"/>
@@ -788,7 +793,7 @@ defineOptions({
   name: 'sys-setting'
 })
 
-const currentVersion = 'v3.0.0'
+const currentVersion = 'v3.0.1'
 const hasUpdate = ref(false)
 let getUpdateErrorCount = 1;
 const {t, locale} = useI18n();

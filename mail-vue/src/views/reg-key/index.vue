@@ -71,19 +71,19 @@
           <el-radio-button value="batch">{{ $t('batchRegKey') }}</el-radio-button>
         </el-radio-group>
         <template v-if="addMode === 'single'">
-          <el-input v-model="addForm.code" :placeholder="$t('regKey')">
+          <el-input v-model="addForm.code" :placeholder="$t('regKey')" @keyup.enter="submit">
             <template #suffix>
               <Icon @click.stop="genCode" class="gen-code" icon="bitcoin-icons:refresh-filled" width="24" height="24"/>
             </template>
           </el-input>
           <div class="number-field">
             <span>{{ $t('availableUses') }}</span>
-            <el-input-number v-model="addForm.count" :min="1" :max="99999"/>
+            <el-input-number v-model="addForm.count" :min="1" :max="99999" @keyup.enter="submit"/>
           </div>
         </template>
         <div v-else class="number-field">
           <span>{{ $t('batchQuantity') }}</span>
-          <el-input-number v-model="addForm.batchCount" :min="1" :max="200"/>
+          <el-input-number v-model="addForm.batchCount" :min="1" :max="200" @keyup.enter="submit"/>
           <div class="batch-hint">{{ $t('batchOneTimeHint') }}</div>
         </div>
         <el-select v-model="addForm.roleId" :placeholder="$t('roleDesc')">
@@ -367,6 +367,8 @@ function clearNotUse() {
 }
 
 function submit() {
+
+  if (addLoading.value) return
 
   if (addMode.value === 'single' && !addForm.code) {
     ElMessage({

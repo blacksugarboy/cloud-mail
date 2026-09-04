@@ -1,9 +1,10 @@
 {
 	"name": "mail-worker",
-	"version": "3.0.1",
+	"version": "3.2.0",
 	"private": true,
 	"scripts": {
 		"dev": "wrangler dev --config wrangler-dev.toml",
+		"test:regression": "vitest run",
 		"test": "wrangler deploy --config wrangler-test.toml",
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev"

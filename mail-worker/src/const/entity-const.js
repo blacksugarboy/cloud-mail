@@ -120,6 +120,10 @@ export const settingConst = {
 		OPEN: 0,
 		CLOSE: 1,
 	},
+	webhookStatus: {
+		OPEN: 0,
+		CLOSE: 1,
+	},
 	ruleType: {
 		ALL: 0,
 		RULE: 1
@@ -133,6 +137,10 @@ export const settingConst = {
 		CLOSE: 1
 	},
 	forcePathStyle: {
+		OPEN: 0,
+		CLOSE: 1
+	},
+	syncDelete: {
 		OPEN: 0,
 		CLOSE: 1
 	},
